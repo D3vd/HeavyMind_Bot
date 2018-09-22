@@ -1,10 +1,6 @@
-# TODO: Create a system that prevents duplicate Tweets
-
 import praw
 import configparser
 import urllib.request
-import time
-import os
 
 from prawcore.exceptions import ResponseException
 from urllib.error import HTTPError
@@ -32,6 +28,19 @@ def save_list(img_url_list):
         file.close()
 
 
+def delete_img_list():
+    f = open('img_links.txt', 'r+')
+    f.truncate()
+
+
+def is_img_link(img_link):
+    ext = img_link[-4:]
+    if ext == '.jpg' or ext == '.png':
+        return True
+    else:
+        return False
+
+
 def get_img_urls(sub, li):
     try:
         r = praw.Reddit(client_id=ClientInfo.id, client_secret=ClientInfo.secret, user_agent=ClientInfo.user_agent)
@@ -41,7 +50,6 @@ def get_img_urls(sub, li):
 
     except HTTPError:
         print("Too many Requests. Try again later!")
-        time.sleep(400)
         return 0
 
     except ResponseException:
@@ -49,25 +57,44 @@ def get_img_urls(sub, li):
         return 0
 
 
-def download_img(img_url, img_title, filename):
+def download_img(img_url, img_title, img_loc):
     opener = urllib.request.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
     urllib.request.install_opener(opener)
     try:
         print('Downloading ' + img_title + '....')
-        urllib.request.urlretrieve(img_url, filename)
+        urllib.request.urlretrieve(img_url, img_loc)
         return 1
 
-    except HTTPError as e:
+    except HTTPError:
         print("Too many Requests. Try again later!")
         return 0
 
 
-def remove_wrong_format():
-    loc = 'images/'
-    for image in os.listdir(loc):
-        if not image.endswith('.jpg'):
-            os.remove(image)
+def read_img_links():
+    with open('img_links.txt') as f:
+        links = f.readlines()
+
+    links = [x.strip() for x in links]
+    download_count = 0
+
+    for link in links:
+        if not is_img_link(link):
+            continue
+
+        file_name = link.split('/')[-1]
+        file_loc = 'images/{}'.format(file_name)
+
+        if not file_name:
+            continue
+
+        download_status = download_img(link, file_name, file_loc)
+        download_count += 1
+
+        if download_status == 0:
+            return download_count, 0
+
+    return download_count, 1
 
 
 if __name__ == '__main__':
@@ -82,12 +109,11 @@ if __name__ == '__main__':
     if url_list:
 
         save_list(url_list)
+        count, status = read_img_links()
 
-        for url in url_list:
+        if status == 1:
+            print('\nDownload Complete\n{} - Images Downloaded\n{} - Posts Ignored'.format(count, num-count))
+        elif status == 0:
+            print('\nDownload Incomplete\n{} - Images Downloaded'.format(count))
 
-            file_name = 'images/'
-            # status = download_img(url, url.split('/')[-1], file_name+url.split('/')[-1])
-
-
-
-
+    delete_img_list()
