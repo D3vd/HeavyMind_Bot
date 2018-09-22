@@ -1,6 +1,9 @@
 import tweepy
 import configparser
 import os
+import time
+
+from tweepy.error import TweepError
 
 
 def get_tokens():
@@ -13,14 +16,48 @@ def get_tokens():
     return api_key, api_secret_key, access_token_key, access_token_secret
 
 
+def write_tweeted_img(file_name):
+    file = open('tweeted_imgs.txt', 'a')
+    file.write('{}\n'.format(file_name))
+    file.close()
+
+
+def check_img_tweeted(file_name):
+    with open('tweeted_imgs.txt') as f:
+        if file_name in f.read():
+            return True
+    return False
+
+
 if __name__ == '__main__':
     consumer_key, consumer_secret, access_token, access_secret = get_tokens()
+    wait_time = 30
+    count = 0
 
+    print('Connecting to Twitter...')
     auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_secret)
     api = tweepy.API(auth)
+    print('Connected!\n')
 
-    os.chdir('demo')
+    os.chdir('images')
     for image in os.listdir('.'):
-        print(image)
-        api.update_with_media(image)
+
+        if check_img_tweeted(image):
+            print('Already Tweeted {} before'.format(image))
+            continue
+
+        try:
+            api.update_with_media(image)
+            print('Tweeted {}....'.format(image))
+            write_tweeted_img(image)
+            count += 1
+            os.remove(image)
+
+        except TweepError:
+            continue
+
+        print('Waiting {}secs'.format(wait_time))
+        time.sleep(wait_time)
+
+    print('Successfully Tweeted {} Images'.format(count))
