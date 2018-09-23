@@ -1,9 +1,15 @@
 import tweepy
 import configparser
 import os
+import threading
 import time
+import sys
 
 from tweepy.error import TweepError
+
+
+WAIT_TIME = 20
+done = False
 
 
 def get_tokens():
@@ -14,6 +20,16 @@ def get_tokens():
     access_token_key = config['TWITTER']['ACCESS_TOKEN']
     access_token_secret = config['TWITTER']['ACCESS_TOKEN_SECRET']
     return api_key, api_secret_key, access_token_key, access_token_secret
+
+
+def animate():
+    for c in range(WAIT_TIME, -1, -1):
+        if done:
+            break
+        sys.stdout.write('\rWaiting for ' + str(c) + ' secs.... ')
+        sys.stdout.flush()
+        time.sleep(1)
+    sys.stdout.write('\rTweeting\n')
 
 
 def write_tweeted_img(file_name):
@@ -31,7 +47,6 @@ def check_img_tweeted(file_name):
 
 if __name__ == '__main__':
     consumer_key, consumer_secret, access_token, access_secret = get_tokens()
-    wait_time = 30
     count = 0
 
     print('Connecting to Twitter...')
@@ -45,19 +60,23 @@ if __name__ == '__main__':
 
         if check_img_tweeted(image):
             print('Already Tweeted {} before'.format(image))
+            os.remove(image)
             continue
 
         try:
             api.update_with_media(image)
-            print('Tweeted {}....'.format(image))
+            print('Tweeted {}'.format(image))
             write_tweeted_img(image)
             count += 1
             os.remove(image)
+            done = False
 
         except TweepError:
             continue
 
-        print('Waiting {}secs'.format(wait_time))
-        time.sleep(wait_time)
+        t = threading.Thread(target=animate)
+        t.start()
+        time.sleep(WAIT_TIME)
+        done = True
 
-    print('Successfully Tweeted {} Images'.format(count))
+    print('\nSuccessfully Tweeted {} Images'.format(count))
